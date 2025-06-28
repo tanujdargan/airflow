@@ -55,6 +55,7 @@ from airflow.models.dag_version import DagVersion
 from airflow.models.dagrun import DagRun
 from airflow.models.pool import Pool
 from airflow.models.taskinstance import TaskInstance
+from airflow.models.deadline import Deadline
 from airflow.models.variable import Variable
 from airflow.typing_compat import Self
 from airflow.utils import timezone
@@ -598,6 +599,29 @@ QueryDagRunRunTypesFilter = Annotated[
             transform_callable=_transform_dag_run_types,
         )
     ),
+]
+
+
+class _MissedDeadlinesFilter(BaseParam[bool]):
+    """Filter dag runs that missed their deadline."""
+
+    def to_orm(self, select: Select) -> Select:
+        if not self.value:
+            return select
+        return (
+            select.join(Deadline, DagRun.id == Deadline.dagrun_id)
+            .where(DagRun.last_scheduling_decision.is_not(None))
+            .where(Deadline.deadline_time < DagRun.last_scheduling_decision)
+        )
+
+    @classmethod
+    def depends(cls, missed_deadlines: bool | None = Query(default=None)) -> _MissedDeadlinesFilter:
+        return cls().set_value(missed_deadlines)
+
+
+QueryDagRunMissedDeadlinesFilter = Annotated[
+    _MissedDeadlinesFilter,
+    Depends(_MissedDeadlinesFilter.depends),
 ]
 
 # DAGTags
