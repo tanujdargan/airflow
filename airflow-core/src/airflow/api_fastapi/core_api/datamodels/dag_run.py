@@ -168,3 +168,4 @@ class DAGRunsBatchBody(StrictBaseModel):
     start_date_lte: AwareDatetime | None = None
     end_date_gte: AwareDatetime | None = None
     end_date_lte: AwareDatetime | None = None
+    missed_deadlines: bool | None = None

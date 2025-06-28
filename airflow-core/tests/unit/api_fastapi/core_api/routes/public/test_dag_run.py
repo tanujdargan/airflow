@@ -29,6 +29,7 @@ from airflow._shared.timezones import timezone
 from airflow.api_fastapi.core_api.datamodels.dag_versions import DagVersionResponse
 from airflow.listeners.listener import get_listener_manager
 from airflow.models import DagModel, DagRun
+from airflow.models.deadline import Deadline
 from airflow.models.asset import AssetEvent, AssetModel
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.sdk.definitions.asset import Asset
@@ -576,6 +577,26 @@ class TestGetDagRuns:
             response.json()["detail"] == f"Invalid value for state. Valid values are {', '.join(DagRunState)}"
         )
 
+    def test_missed_deadlines_filter(self, test_client, dag_maker, session):
+        with dag_maker(dag_id="deadline_dag", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr = dag_maker.create_dagrun(run_id="deadline_run", logical_date=LOGICAL_DATE1)
+        dr.last_scheduling_decision = LOGICAL_DATE1 + timedelta(hours=2)
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr.last_scheduling_decision - timedelta(hours=1),
+                dag_id=dr.dag_id,
+                dagrun_id=dr.id,
+                callback="print",
+            )
+        )
+        session.commit()
+
+        response = test_client.get(f"/dags/{dr.dag_id}/dagRuns", params={"missed_deadlines": True})
+        assert response.status_code == 200
+        body = response.json()
+        assert [r["dag_run_id"] for r in body["dag_runs"]] == ["deadline_run"]
+
 
 class TestListDagRunsBatch:
     @pytest.mark.usefixtures("configure_git_connection_for_dag_bundle")
@@ -901,6 +922,28 @@ class TestListDagRunsBatch:
         response = test_client.post("/dags/~/dagRuns/list", json=post_body)
         assert response.status_code == 422
         assert response.json()["detail"] == expected_response
+
+    def test_missed_deadlines_filter(self, test_client, dag_maker, session):
+        with dag_maker(dag_id="deadline_dag_batch", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr = dag_maker.create_dagrun(run_id="deadline_run_batch", logical_date=LOGICAL_DATE1)
+        dr.last_scheduling_decision = LOGICAL_DATE1 + timedelta(hours=2)
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr.last_scheduling_decision - timedelta(hours=1),
+                dag_id=dr.dag_id,
+                dagrun_id=dr.id,
+                callback="print",
+            )
+        )
+        session.commit()
+        response = test_client.post(
+            "/dags/~/dagRuns/list",
+            json={"dag_ids": [dr.dag_id], "missed_deadlines": True},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert [r["dag_run_id"] for r in body["dag_runs"]] == ["deadline_run_batch"]
 
 
 class TestPatchDagRun:

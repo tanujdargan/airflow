@@ -2052,6 +2052,12 @@ paths:
             format: date-time
           - type: 'null'
           title: Updated At Lte
+      - name: missed_deadlines
+        in: query
+        required: false
+        schema:
+          type: boolean
+          title: Missed Deadlines
       - name: run_type
         in: query
         required: false
@@ -9493,6 +9499,9 @@ components:
             format: date-time
           - type: 'null'
           title: End Date Lte
+        missed_deadlines:
+          type: boolean
+          title: Missed Deadlines
       additionalProperties: false
       type: object
       title: DAGRunsBatchBody
@@ -11316,6 +11325,9 @@ components:
             format: date-time
           - type: 'null'
           title: End Date Lte
+        missed_deadlines:
+          type: boolean
+          title: Missed Deadlines
         duration_gte:
           anyOf:
           - type: number

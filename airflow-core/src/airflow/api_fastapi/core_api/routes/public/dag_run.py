@@ -43,6 +43,8 @@ from airflow.api_fastapi.common.parameters import (
     OffsetFilter,
     QueryDagRunRunTypesFilter,
     QueryDagRunStateFilter,
+    QueryDagRunMissedDeadlinesFilter,
+    _MissedDeadlinesFilter,
     QueryLimit,
     QueryOffset,
     Range,
@@ -317,6 +319,7 @@ def get_dag_runs(
     update_at_range: Annotated[RangeFilter, Depends(datetime_range_filter_factory("updated_at", DagRun))],
     run_type: QueryDagRunRunTypesFilter,
     state: QueryDagRunStateFilter,
+    missed_deadlines: QueryDagRunMissedDeadlinesFilter,
     order_by: Annotated[
         SortParam,
         Depends(
@@ -368,6 +371,7 @@ def get_dag_runs(
             update_at_range,
             state,
             run_type,
+            missed_deadlines,
             readable_dag_runs_filter,
             run_id_pattern,
         ],
@@ -524,6 +528,7 @@ def get_list_dag_runs_batch(
         Range(lower_bound=body.end_date_gte, upper_bound=body.end_date_lte),
         attribute=DagRun.end_date,
     )
+    missed_deadlines = _MissedDeadlinesFilter().set_value(body.missed_deadlines)
     state = FilterParam(DagRun.state, body.states, FilterOptionEnum.ANY_EQUAL)
 
     offset = OffsetFilter(body.page_offset)
@@ -549,7 +554,16 @@ def get_list_dag_runs_batch(
     base_query = select(DagRun).options(joinedload(DagRun.dag_model))
     dag_runs_select, total_entries = paginated_select(
         statement=base_query,
-        filters=[dag_ids, logical_date, run_after, start_date, end_date, state, readable_dag_runs_filter],
+        filters=[
+            dag_ids,
+            logical_date,
+            run_after,
+            start_date,
+            end_date,
+            missed_deadlines,
+            state,
+            readable_dag_runs_filter,
+        ],
         order_by=order_by,
         offset=offset,
         limit=limit,
