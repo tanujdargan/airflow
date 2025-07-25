@@ -635,15 +635,39 @@ QueryDagRunRunTypesFilter = Annotated[
 
 
 class _MissedDeadlinesFilter(BaseParam[bool]):
-    """Filter dag runs that missed their deadline."""
+    """
+    Filter dag runs that missed their deadline.
+    
+    A DagRun is considered to have "missed" its deadline if:
+    1. The DagRun has a last_scheduling_decision timestamp (not None)
+    2. There exists at least one deadline associated with the DagRun where 
+       the deadline_time is before the last_scheduling_decision timestamp
+    
+    This filter uses an EXISTS subquery for optimal performance, ensuring that
+    DagRuns with multiple missed deadlines are returned only once.
+    
+    When missed_deadlines=True: Returns only DagRuns that have missed their deadlines
+    When missed_deadlines=False or None: Returns all DagRuns (no filtering applied)
+    """
 
     def to_orm(self, select: Select) -> Select:
         if not self.value:
             return select
-        return (
-            select.join(Deadline, DagRun.id == Deadline.dagrun_id)
-            .where(DagRun.last_scheduling_decision.is_not(None))
+        
+        # A deadline is considered "missed" if:
+        # 1. The DagRun has a last_scheduling_decision (not None)
+        # 2. There exists at least one deadline where deadline_time < last_scheduling_decision
+        missed_deadline_exists = (
+            select(Deadline.id)
+            .where(Deadline.dagrun_id == DagRun.id)
             .where(Deadline.deadline_time < DagRun.last_scheduling_decision)
+            .exists()
+        )
+        
+        return (
+            select
+            .where(DagRun.last_scheduling_decision.is_not(None))
+            .where(missed_deadline_exists)
         )
 
     @classmethod

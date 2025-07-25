@@ -597,6 +597,75 @@ class TestGetDagRuns:
         body = response.json()
         assert [r["dag_run_id"] for r in body["dag_runs"]] == ["deadline_run"]
 
+    def test_missed_deadlines_filter_edge_cases(self, test_client, dag_maker, session):
+        """Test missed deadlines filter with various edge cases."""
+        
+        # Case 1: DagRun with multiple missed deadlines (should appear only once)
+        with dag_maker(dag_id="multi_deadline_dag", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr1 = dag_maker.create_dagrun(run_id="multi_deadline_run", logical_date=LOGICAL_DATE1)
+        dr1.last_scheduling_decision = LOGICAL_DATE1 + timedelta(hours=3)
+        
+        # Add multiple deadlines that are all missed
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr1.last_scheduling_decision - timedelta(hours=2),
+                dag_id=dr1.dag_id,
+                dagrun_id=dr1.id,
+                callback="print",
+            )
+        )
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr1.last_scheduling_decision - timedelta(hours=1),
+                dag_id=dr1.dag_id,
+                dagrun_id=dr1.id,
+                callback="print",
+            )
+        )
+        
+        # Case 2: DagRun with no last_scheduling_decision (should not appear)
+        with dag_maker(dag_id="no_decision_dag", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr2 = dag_maker.create_dagrun(run_id="no_decision_run", logical_date=LOGICAL_DATE1)
+        dr2.last_scheduling_decision = None  # No scheduling decision yet
+        
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=LOGICAL_DATE1 + timedelta(hours=1),
+                dag_id=dr2.dag_id,
+                dagrun_id=dr2.id,
+                callback="print",
+            )
+        )
+        
+        # Case 3: DagRun with deadline NOT missed (should not appear)
+        with dag_maker(dag_id="not_missed_dag", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr3 = dag_maker.create_dagrun(run_id="not_missed_run", logical_date=LOGICAL_DATE1)
+        dr3.last_scheduling_decision = LOGICAL_DATE1 + timedelta(hours=1)
+        
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr3.last_scheduling_decision + timedelta(hours=1),  # Deadline after decision
+                dag_id=dr3.dag_id,
+                dagrun_id=dr3.id,
+                callback="print",
+            )
+        )
+        
+        session.commit()
+
+        # Test the filter - should only return dr1 (multi_deadline_run), and only once
+        response = test_client.get("/dags/~/dagRuns", params={"missed_deadlines": True})
+        assert response.status_code == 200
+        body = response.json()
+        
+        # Should only return the DagRun with missed deadlines, and only once despite multiple deadlines
+        dag_run_ids = [r["dag_run_id"] for r in body["dag_runs"]]
+        assert dag_run_ids == ["multi_deadline_run"]
+        assert len(dag_run_ids) == 1  # Ensure no duplicates
+
 
 class TestListDagRunsBatch:
     @pytest.mark.usefixtures("configure_git_connection_for_dag_bundle")
@@ -944,6 +1013,44 @@ class TestListDagRunsBatch:
         assert response.status_code == 200
         body = response.json()
         assert [r["dag_run_id"] for r in body["dag_runs"]] == ["deadline_run_batch"]
+
+    def test_missed_deadlines_filter_no_duplicates(self, test_client, dag_maker, session):
+        """Test that DagRuns with multiple missed deadlines don't appear as duplicates."""
+        with dag_maker(dag_id="multi_missed_dag", serialized=True) as dag:
+            EmptyOperator(task_id="t1")
+        dr = dag_maker.create_dagrun(run_id="multi_missed_run", logical_date=LOGICAL_DATE1)
+        dr.last_scheduling_decision = LOGICAL_DATE1 + timedelta(hours=3)
+        
+        # Add multiple missed deadlines for the same DagRun
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr.last_scheduling_decision - timedelta(hours=2),
+                dag_id=dr.dag_id,
+                dagrun_id=dr.id,
+                callback="print",
+            )
+        )
+        Deadline.add_deadline(
+            Deadline(
+                deadline_time=dr.last_scheduling_decision - timedelta(hours=1),
+                dag_id=dr.dag_id,
+                dagrun_id=dr.id,
+                callback="print",
+            )
+        )
+        session.commit()
+        
+        response = test_client.post(
+            "/dags/~/dagRuns/list",
+            json={"dag_ids": [dr.dag_id], "missed_deadlines": True},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        
+        # Should only return the DagRun once, even though it has multiple missed deadlines
+        dag_run_ids = [r["dag_run_id"] for r in body["dag_runs"]]
+        assert dag_run_ids == ["multi_missed_run"]
+        assert len(dag_run_ids) == 1  # Ensure no duplicates
 
 
 class TestPatchDagRun:

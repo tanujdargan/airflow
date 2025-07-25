@@ -119,6 +119,18 @@ class Deadline(Base):
 
     @classmethod
     @provide_session
+    def add_deadline(cls, deadline: Deadline, *, session: Session) -> None:
+        """
+        Add a deadline to the database.
+
+        :param deadline: The deadline object to add.
+        :param session: Database session.
+        """
+        session.add(deadline)
+        session.flush()
+
+    @classmethod
+    @provide_session
     def prune_deadlines(cls, *, session: Session, conditions: dict[Column, Any]) -> int:
         """
         Remove deadlines from the table which match the provided conditions and return the number removed.
