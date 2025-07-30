@@ -24,7 +24,7 @@ import { NavLink } from "react-router-dom";
 import {
   useAuthLinksServiceGetAuthMenus,
   useVersionServiceGetVersion,
-  useConfigServiceGetConfigs,
+  usePluginServiceGetPlugins,
 } from "openapi/queries";
 import type { ExternalViewResponse } from "openapi/requests/types.gen";
 import { AirflowPin } from "src/assets/AirflowPin";
@@ -44,7 +44,7 @@ const existingCategories = ["user", "docs", "admin", "browse"];
 
 // Function to categorize navigation items in a single pass
 const categorizeNavItems = (
-  navItems: Array<NavItemResponse>,
+  items: Array<NavItemResponse>,
 ): {
   adminItems: Array<NavItemResponse>;
   browseItems: Array<NavItemResponse>;
@@ -58,27 +58,22 @@ const categorizeNavItems = (
   const topNavItems: Array<NavItemResponse> = [];
   const userItems: Array<NavItemResponse> = [];
 
-  navItems.forEach((item) => {
-    if (item.category) {
-      const categoryLower = item.category.toLowerCase();
+  items.forEach((item) => {
+    const category = item.category?.toLowerCase();
 
-      switch (categoryLower) {
-        case "admin":
-          adminItems.push(item);
-          break;
-        case "browse":
-          browseItems.push(item);
-          break;
-        case "docs":
-          docsItems.push(item);
-          break;
-        case "user":
-          userItems.push(item);
-          break;
-        default:
-          topNavItems.push(item);
-      }
-    } else {
+    // Categorize items for specific buttons
+    if (category === "browse") {
+      browseItems.push(item);
+    } else if (category === "admin") {
+      adminItems.push(item);
+    } else if (category === "docs") {
+      docsItems.push(item);
+    } else if (category === "user") {
+      userItems.push(item);
+    }
+
+    // Add to top nav items if not in existing categories
+    if (category === undefined || !existingCategories.includes(category)) {
       topNavItems.push(item);
     }
   });
@@ -95,24 +90,40 @@ const categorizeNavItems = (
 export const Nav = () => {
   const { data } = useVersionServiceGetVersion();
   const { data: authLinks } = useAuthLinksServiceGetAuthMenus();
-  const { data: config } = useConfigServiceGetConfigs();
+  const { data: pluginData } = usePluginServiceGetPlugins();
   const { t: translate } = useTranslation("common");
 
-  // Convert AppBuilderMenuItemResponse to NavItemResponse format
+  // Get both external views and react apps with nav destination
   const navItems: Array<NavItemResponse> =
-    config?.plugins_extra_menu_items?.map((item) => ({
-      category: item.category,
-      destination: "nav",
-      href: item.href,
-      name: item.name,
-      url_route: null, // External views have url_route as null
-    } as ExternalViewResponse)) ?? [];
+    pluginData?.plugins
+      .flatMap((plugin) => [...plugin.external_views, ...plugin.react_apps])
+      .filter((item) => item.destination === "nav") ?? [];
 
   // Categorize all navigation items in a single pass
   const { adminItems, browseItems, docsItems, topNavItems, userItems } = categorizeNavItems(navItems);
 
-  // Add legacy views placeholder - in the future this can be populated from config as well
-  const navItemsWithLegacy = topNavItems;
+  // Check for legacy views
+  const hasLegacyViews =
+    (
+      pluginData?.plugins
+        .flatMap((plugin) => plugin.appbuilder_views)
+        // Only include legacy views that have a visible link in the menu. No menu items views
+        // are accessible via direct URLs.
+        .filter((view) => typeof view.name === "string" && view.name.length > 0) ?? []
+    ).length >= 1;
+
+  // Add legacy views if they exist
+  const navItemsWithLegacy = hasLegacyViews
+    ? [
+        ...topNavItems,
+        {
+          destination: "nav",
+          href: "/pluginsv2",
+          name: translate("nav.legacyFabViews"),
+          url_route: "legacy-fab-views",
+        } as ExternalViewResponse,
+      ]
+    : topNavItems;
 
   return (
     <VStack
