@@ -532,6 +532,24 @@ class AirflowKubernetesScheduler(LoggingMixin):
             kube_watcher.terminate()
             self.log.debug("kube_watcher=%s", kube_watcher)
 
+        # for now 20 seconds is max wait time for kube watchers to terminate.
+        max_wait_time = 20
+        start_time = time.time()
+        for kube_watcher in self.kube_watchers.values():
+            kube_watcher.join(timeout=max(int(max_wait_time - (time.time() - start_time)), 0))
+            if kube_watcher.is_alive():
+                self.log.warning("kube_watcher didn't terminate in time=%s", kube_watcher)
+                kube_watcher.kill()
+                kube_watcher.join()
+            self.log.debug("kube_watcher=%s", kube_watcher)
+        self.log.debug("Flushing watcher_queue...")
+        self._flush_watcher_queue()
+        # Queue should be empty...
+        self.watcher_queue.join()
+        self.log.debug("Shutting down manager...")
+        self._manager.shutdown()
+
+
 def get_base_pod_from_template(pod_template_file: str | None, kube_config: Any) -> k8s.V1Pod:
     """
     Get base pod from template.
