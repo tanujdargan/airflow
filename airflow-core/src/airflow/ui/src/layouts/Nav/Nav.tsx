@@ -24,9 +24,9 @@ import { NavLink } from "react-router-dom";
 import {
   useAuthLinksServiceGetAuthMenus,
   useVersionServiceGetVersion,
-  usePluginServiceGetPlugins,
+  useConfigServiceGetConfigs,
 } from "openapi/queries";
-import type { ExternalViewResponse } from "openapi/requests/types.gen";
+import type { AppBuilderMenuItemResponse, ExternalViewResponse } from "openapi/requests/types.gen";
 import { AirflowPin } from "src/assets/AirflowPin";
 import { DagIcon } from "src/assets/DagIcon";
 import type { NavItemResponse } from "src/utils/types";
@@ -90,40 +90,18 @@ const categorizeNavItems = (
 export const Nav = () => {
   const { data } = useVersionServiceGetVersion();
   const { data: authLinks } = useAuthLinksServiceGetAuthMenus();
-  const { data: pluginData } = usePluginServiceGetPlugins();
+  const { data: config } = useConfigServiceGetConfigs();
   const { t: translate } = useTranslation("common");
 
   // Get both external views and react apps with nav destination
-  const navItems: Array<NavItemResponse> =
-    pluginData?.plugins
-      .flatMap((plugin) => [...plugin.external_views, ...plugin.react_apps])
-      .filter((item) => item.destination === "nav") ?? [];
+    const navItems: Array<NavItemResponse> =
+      config?.plugins_extra_menu_items?.map((item: AppBuilderMenuItemResponse) => ({
+        ...item,
+        destination: "nav" as const,
+      } satisfies NavItemResponse)) ?? [];
 
   // Categorize all navigation items in a single pass
   const { adminItems, browseItems, docsItems, topNavItems, userItems } = categorizeNavItems(navItems);
-
-  // Check for legacy views
-  const hasLegacyViews =
-    (
-      pluginData?.plugins
-        .flatMap((plugin) => plugin.appbuilder_views)
-        // Only include legacy views that have a visible link in the menu. No menu items views
-        // are accessible via direct URLs.
-        .filter((view) => typeof view.name === "string" && view.name.length > 0) ?? []
-    ).length >= 1;
-
-  // Add legacy views if they exist
-  const navItemsWithLegacy = hasLegacyViews
-    ? [
-        ...topNavItems,
-        {
-          destination: "nav",
-          href: "/pluginsv2",
-          name: translate("nav.legacyFabViews"),
-          url_route: "legacy-fab-views",
-        } as ExternalViewResponse,
-      ]
-    : topNavItems;
 
   return (
     <VStack
@@ -173,7 +151,7 @@ export const Nav = () => {
           externalViews={adminItems}
         />
         <SecurityButton />
-        <PluginMenus navItems={navItemsWithLegacy} />
+        <PluginMenus navItems={topNavItems} />
       </Flex>
       <Flex flexDir="column">
         <DocsButton

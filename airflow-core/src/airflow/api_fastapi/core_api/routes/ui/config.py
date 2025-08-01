@@ -23,8 +23,9 @@ from fastapi import Depends, status
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.datamodels.ui.config import ConfigResponse
 from airflow.api_fastapi.core_api.openapi.exceptions import create_openapi_http_exception_doc
-from airflow.api_fastapi.core_api.security import requires_authenticated
+from airflow.api_fastapi.core_api.security import GetUserDep, requires_authenticated
 from airflow.configuration import conf
+from airflow.plugins_manager import get_plugin_info
 from airflow.settings import DASHBOARD_UIALERTS
 from airflow.utils.log.log_reader import TaskLogReader
 
@@ -46,17 +47,46 @@ API_CONFIG_KEYS = [
     responses=create_openapi_http_exception_doc([status.HTTP_404_NOT_FOUND]),
     dependencies=[Depends(requires_authenticated())],
 )
-def get_configs() -> ConfigResponse:
+def get_configs(user: GetUserDep) -> ConfigResponse:
     """Get configs for UI."""
     config = {key: conf.get("api", key) for key in API_CONFIG_KEYS}
 
     task_log_reader = TaskLogReader()
+    all_plugins = get_plugin_info()
+    
+    # Import auth manager here to avoid potential circular import issues
+    from airflow.api_fastapi.app import get_auth_manager
+    auth_manager = get_auth_manager()
+    
+    accessible_plugins = []
+    for plugin in all_plugins:
+        if plugin.get("appbuilder_menu_items"):
+            for menu_item in plugin["appbuilder_menu_items"]:
+                try:
+                    if auth_manager.is_authorized_custom_view(
+                        method="GET", resource_name=menu_item["name"], user=user
+                    ):
+                        accessible_plugins.append(plugin)
+                        break
+                except (AttributeError, KeyError) as e:
+                    # Skip plugin if menu item structure is invalid
+                    continue
+                except Exception as e:
+                    # Log unexpected authorization errors for debugging
+                    # Consider adding: logger.warning(
+                    #     f"Authorization check failed for plugin {plugin.get('name', 'unknown')}: {e}"
+                    # )
+                    continue
+
     additional_config: dict[str, Any] = {
         "instance_name": conf.get("api", "instance_name", fallback="Airflow"),
         "test_connection": conf.get("core", "test_connection", fallback="Disabled"),
         "dashboard_alert": DASHBOARD_UIALERTS,
         "show_external_log_redirect": task_log_reader.supports_external_link,
         "external_log_name": getattr(task_log_reader.log_handler, "log_name", None),
+        "plugins_extra_menu_items": [
+            item for p in accessible_plugins for item in p.get("appbuilder_menu_items", [])
+        ],
     }
 
     config.update({key: value for key, value in additional_config.items()})
