@@ -81,14 +81,20 @@ export const AdminButton = ({
     .map((view) => (
       <Menu.Item asChild key={view.title} value={view.title}>
         {view.external ? (
-          <PluginMenuItem
-            name={view.title}
-            bundle_url={(view as unknown as ReactAppResponse).bundle_url}
-          />
+          view.bundle_url ? (
+            <PluginMenuItem
+              name={view.title}
+              bundle_url={view.bundle_url}
+            />
+          ) : (
+            <RouterLink aria-label={translate(`admin.${view.title}`)} to={view.href}>
+              {translate(`admin.${view.title}`)}
+            </RouterLink>
+          )
         ) : (
           <RouterLink aria-label={translate(`admin.${view.title}`)} to={view.href}>
             {translate(`admin.${view.title}`)}
-        </RouterLink>
+          </RouterLink>
         )}
       </Menu.Item>
     ));
