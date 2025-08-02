@@ -20,6 +20,7 @@ from typing import Any
 
 from fastapi import Depends, status
 
+from airflow.api_fastapi.app import get_auth_manager
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.datamodels.ui.config import ConfigResponse
 from airflow.api_fastapi.core_api.openapi.exceptions import create_openapi_http_exception_doc
@@ -53,14 +54,7 @@ def get_configs(user: GetUserDep) -> ConfigResponse:
 
     task_log_reader = TaskLogReader()
     all_plugins = get_plugin_info()
-    
-    # Import auth manager here to avoid potential circular import issues
-    from airflow.api_fastapi.app import get_auth_manager
     auth_manager = get_auth_manager()
-    
-import logging
-
-logger = logging.getLogger(__name__)
 
     accessible_plugins = []
     for plugin in all_plugins:
@@ -72,21 +66,9 @@ logger = logging.getLogger(__name__)
                     ):
                         accessible_plugins.append(plugin)
                         break
-                except (AttributeError, KeyError) as e:
-                    # Skip plugin if menu item structure is invalid
-                    logger.debug(
-                        "Skipping plugin %s due to invalid menu item structure: %s",
-                        plugin.get('name', 'unknown'),
-                        str(e)
-                    )
+                except Exception:
                     continue
-                except Exception as e:
-                    logger.warning(
-                        "Authorization check failed for plugin %s: %s",
-                        plugin.get('name', 'unknown'),
-                        str(e)
-                    )
-                    continue
+
     additional_config: dict[str, Any] = {
         "instance_name": conf.get("api", "instance_name", fallback="Airflow"),
         "test_connection": conf.get("core", "test_connection", fallback="Disabled"),

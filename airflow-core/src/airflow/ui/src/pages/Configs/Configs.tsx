@@ -21,10 +21,8 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useConfigServiceGetConfig, useAuthLinksServiceGetAuthMenus } from "openapi/queries";
-import { ErrorAlert } from "src/components/ErrorAlert";
 import { DataTable } from "src/components/DataTable";
-
-import type { ConfigSection, ConfigOption } from "openapi/requests/types.gen";
+import { ErrorAlert } from "src/components/ErrorAlert";
 
 const createColumns = (translate: (key: string) => string) => [
   {
@@ -43,15 +41,36 @@ const createColumns = (translate: (key: string) => string) => [
 
 export const Configs = () => {
   const { t: translate } = useTranslation(["admin", "common"]);
-  const { data: authLinks } = useAuthLinksServiceGetAuthMenus();
-  
-  // Only make API call if user has access to config
+  const { data: authLinks, error: authError, isLoading: isAuthLoading } = useAuthLinksServiceGetAuthMenus();
+
+  // All hooks must be called at the top level, before any returns
   const hasConfigAccess = authLinks?.authorized_menu_items.includes("Config") ?? false;
   const { data, error } = useConfigServiceGetConfig(undefined, undefined, {
     enabled: Boolean(authLinks) && hasConfigAccess,
   });
-
   const columns = useMemo(() => createColumns(translate), [translate]);
+
+  // Handle auth loading state
+  if (isAuthLoading) {
+    return (
+      <>
+        <Heading mb={4}>{translate("config.title")}</Heading>
+        <Separator />
+        <div>{translate("common:loading")}</div>
+      </>
+    );
+  }
+
+  // Handle auth error state
+  if (Boolean(authError)) {
+    return (
+      <>
+        <Heading mb={4}>{translate("config.title")}</Heading>
+        <Separator />
+        <ErrorAlert error={authError} />
+      </>
+    );
+  }
 
   const render =
     data?.sections.flatMap((section) =>

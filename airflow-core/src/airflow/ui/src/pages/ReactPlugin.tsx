@@ -47,6 +47,7 @@ export const ReactPlugin = ({ reactApp }: { readonly reactApp: ReactAppResponse 
         };
       })
       .catch((error: unknown) => {
+        // eslint-disable-next-line no-console
         console.error("Component Failed Loading:", error);
 
         return {

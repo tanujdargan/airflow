@@ -31,7 +31,7 @@ export const PluginImportErrors = ({ iconOnly = false }: { readonly iconOnly?: b
   const { onClose, onOpen, open } = useDisclosure();
   const { t: translate } = useTranslation("admin");
   const { data: authLinks } = useAuthLinksServiceGetAuthMenus();
-  
+
   // Only make API call if user has access to plugins
   const hasPluginAccess = authLinks?.authorized_menu_items.includes("Plugins") ?? false;
   const { data, error, isLoading } = usePluginServiceImportErrors(undefined, {

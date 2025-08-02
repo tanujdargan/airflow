@@ -26,7 +26,11 @@ import {
   useVersionServiceGetVersion,
   useConfigServiceGetConfigs,
 } from "openapi/queries";
-import type { AppBuilderMenuItemResponse, ExternalViewResponse } from "openapi/requests/types.gen";
+import type {
+  AppBuilderMenuItemResponse,
+  ExternalViewResponse,
+  ConfigResponse,
+} from "openapi/requests/types.gen";
 import { AirflowPin } from "src/assets/AirflowPin";
 import { DagIcon } from "src/assets/DagIcon";
 import type { NavItemResponse } from "src/utils/types";
@@ -94,11 +98,17 @@ export const Nav = () => {
   const { t: translate } = useTranslation("common");
 
   // Get both external views and react apps with nav destination
-    const navItems: Array<NavItemResponse> =
-      config?.plugins_extra_menu_items?.map((item: AppBuilderMenuItemResponse) => ({
-        ...item,
-        destination: "nav" as const,
-      } satisfies NavItemResponse)) ?? [];
+  const configWithPlugins = config as
+    | ({ plugins_extra_menu_items?: Array<AppBuilderMenuItemResponse> } & ConfigResponse)
+    | undefined;
+  const navItems: Array<NavItemResponse> =
+    configWithPlugins?.plugins_extra_menu_items?.map(
+      (item: AppBuilderMenuItemResponse) =>
+        ({
+          ...item,
+          destination: "nav" as const,
+        }) satisfies NavItemResponse,
+    ) ?? [];
 
   // Categorize all navigation items in a single pass
   const { adminItems, browseItems, docsItems, topNavItems, userItems } = categorizeNavItems(navItems);
