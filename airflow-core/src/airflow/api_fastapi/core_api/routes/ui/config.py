@@ -58,6 +58,10 @@ def get_configs(user: GetUserDep) -> ConfigResponse:
     from airflow.api_fastapi.app import get_auth_manager
     auth_manager = get_auth_manager()
     
+import logging
+
+logger = logging.getLogger(__name__)
+
     accessible_plugins = []
     for plugin in all_plugins:
         if plugin.get("appbuilder_menu_items"):
@@ -70,14 +74,19 @@ def get_configs(user: GetUserDep) -> ConfigResponse:
                         break
                 except (AttributeError, KeyError) as e:
                     # Skip plugin if menu item structure is invalid
+                    logger.debug(
+                        "Skipping plugin %s due to invalid menu item structure: %s",
+                        plugin.get('name', 'unknown'),
+                        str(e)
+                    )
                     continue
                 except Exception as e:
-                    # Log unexpected authorization errors for debugging
-                    # Consider adding: logger.warning(
-                    #     f"Authorization check failed for plugin {plugin.get('name', 'unknown')}: {e}"
-                    # )
+                    logger.warning(
+                        "Authorization check failed for plugin %s: %s",
+                        plugin.get('name', 'unknown'),
+                        str(e)
+                    )
                     continue
-
     additional_config: dict[str, Any] = {
         "instance_name": conf.get("api", "instance_name", fallback="Airflow"),
         "test_connection": conf.get("core", "test_connection", fallback="Disabled"),
