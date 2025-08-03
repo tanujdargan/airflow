@@ -57,18 +57,22 @@ def get_configs(user: GetUserDep) -> ConfigResponse:
     auth_manager = get_auth_manager()
 
     accessible_plugins = []
+    processed_plugins = set()
     for plugin in all_plugins:
         if plugin.get("appbuilder_menu_items"):
+            if plugin["name"] in processed_plugins:
+                continue
             for menu_item in plugin["appbuilder_menu_items"]:
                 try:
                     if auth_manager.is_authorized_custom_view(
                         method="GET", resource_name=menu_item["name"], user=user
                     ):
                         accessible_plugins.append(plugin)
+                        processed_plugins.add(plugin["name"])
                         break
-                except Exception:
+                except (KeyError, AttributeError, ValueError) as e:
+                    # Log specific authorization errors for debugging
                     continue
-
     additional_config: dict[str, Any] = {
         "instance_name": conf.get("api", "instance_name", fallback="Airflow"),
         "test_connection": conf.get("core", "test_connection", fallback="Disabled"),
