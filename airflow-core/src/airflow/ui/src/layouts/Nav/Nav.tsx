@@ -93,8 +93,8 @@ export const Nav = () => {
   const { t: translate } = useTranslation("common");
 
   // Get plugin menu items from config instead of plugin service
-  // Type assertion needed until OpenAPI types are regenerated
-  const navItems: Array<AppBuilderMenuItemResponse> = (config as any)?.plugins_extra_menu_items ?? [];
+  // `plugins_extra_menu_items` is now in the OpenAPI schema—types should be up to date
+  const navItems: AppBuilderMenuItemResponse[] = config?.plugins_extra_menu_items ?? [];
 
   // Categorize all navigation items in a single pass
   const { adminItems, browseItems, docsItems, topNavItems, userItems } = categorizeNavItems(navItems);
