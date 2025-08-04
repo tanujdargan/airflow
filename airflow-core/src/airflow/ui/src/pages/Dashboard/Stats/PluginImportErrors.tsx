@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { Box, Text, Button, useDisclosure, Skeleton } from "@chakra-ui/react";
+import { Box, Text, Button, useDisclosure } from "@chakra-ui/react";
 import { useTranslation } from "react-i18next";
 import { FiChevronRight } from "react-icons/fi";
 import { LuPlug } from "react-icons/lu";
 
-import { usePluginServiceImportErrors, useAuthLinksServiceGetAuthMenus } from "openapi/queries";
-import { ErrorAlert, type ExpandedApiError } from "src/components/ErrorAlert";
+import { useConfigServiceGetConfigs } from "openapi/queries";
 import { StateBadge } from "src/components/StateBadge";
 
 import { PluginImportErrorsModal } from "./PluginImportErrorsModal";
@@ -30,29 +29,12 @@ import { PluginImportErrorsModal } from "./PluginImportErrorsModal";
 export const PluginImportErrors = ({ iconOnly = false }: { readonly iconOnly?: boolean }) => {
   const { onClose, onOpen, open } = useDisclosure();
   const { t: translate } = useTranslation("admin");
-  const { data: authLinks } = useAuthLinksServiceGetAuthMenus();
+  const { data: config } = useConfigServiceGetConfigs();
 
-  // Only make API call if user has access to plugins
-  const hasPluginAccess = authLinks?.authorized_menu_items.includes("Plugins") ?? false;
-  const { data, error, isLoading } = usePluginServiceImportErrors(undefined, {
-    enabled: Boolean(authLinks) && hasPluginAccess,
-  });
-
-  const importErrorsCount = data?.total_entries ?? 0;
-  const importErrors = data?.import_errors ?? [];
-
-  // Don't show anything if user doesn't have plugin access
-  if (!hasPluginAccess) {
-    return undefined;
-  }
-
-  if (isLoading) {
-    return <Skeleton height="9" width="225px" />;
-  }
-
-  if (Boolean(error) && (error as ExpandedApiError).status === 403) {
-    return undefined;
-  }
+  // Get plugin import errors from config instead of plugin service
+  // Type assertion needed until OpenAPI types are regenerated
+  const importErrors = (config as any)?.plugin_import_errors ?? [];
+  const importErrorsCount = importErrors.length;
 
   if (importErrorsCount === 0) {
     return undefined;
@@ -60,7 +42,6 @@ export const PluginImportErrors = ({ iconOnly = false }: { readonly iconOnly?: b
 
   return (
     <Box alignItems="center" display="flex" maxH="10px">
-      <ErrorAlert error={error} />
       {iconOnly ? (
         <StateBadge
           as={Button}

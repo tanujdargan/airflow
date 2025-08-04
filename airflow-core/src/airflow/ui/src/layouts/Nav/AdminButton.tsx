@@ -20,12 +20,10 @@ import { useTranslation } from "react-i18next";
 import { FiSettings } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 
-import type { MenuItem } from "openapi/requests/types.gen";
+import type { MenuItem, AppBuilderMenuItemResponse } from "openapi/requests/types.gen";
 import { Menu } from "src/components/ui";
-import type { NavItemResponse } from "src/utils/types";
 
 import { NavButton } from "./NavButton";
-import { PluginMenuItem } from "./PluginMenuItem";
 
 const links = [
   {
@@ -59,12 +57,19 @@ export const AdminButton = ({
   externalViews,
 }: {
   readonly authorizedMenuItems: Array<MenuItem>;
-  readonly externalViews: Array<NavItemResponse>;
+  readonly externalViews: Array<AppBuilderMenuItemResponse>;
 }) => {
   const { t: translate } = useTranslation("common");
 
+  interface CombinedView {
+    external: boolean;
+    href: string;
+    title: string;
+    name?: string;
+  }
+
   // Combine static links and external views
-  const allViews = [
+  const allViews: CombinedView[] = [
     ...links.map((link) => ({ ...link, external: false })),
     ...externalViews
       .filter((view) => Boolean(view.href) && Boolean(view.name))
@@ -72,27 +77,20 @@ export const AdminButton = ({
         external: true,
         href: view.href,
         title: view.name,
+        name: view.name,
       })),
   ];
 
-  // Filter and create menu items
   const menuItems = allViews
     .filter(({ title }) => authorizedMenuItems.includes(title as MenuItem))
     .map((view) => (
       <Menu.Item asChild key={view.title} value={view.title}>
-        {view.external ? (
-          "bundle_url" in view && Boolean(view.bundle_url) ? (
-            <PluginMenuItem bundle_url={view.bundle_url as string} name={view.title} />
-          ) : (
-            <RouterLink aria-label={translate(`admin.${view.title}`)} to={view.href as string}>
-              {translate(`admin.${view.title}`)}
-            </RouterLink>
-          )
-        ) : (
-          <RouterLink aria-label={translate(`admin.${view.title}`)} to={view.href as string}>
-            {translate(`admin.${view.title}`)}
-          </RouterLink>
-        )}
+        <RouterLink
+          aria-label={translate(`admin.${view.title}`)}
+          to={view.href as string}
+        >
+          {translate(`admin.${view.title}`)}
+        </RouterLink>
       </Menu.Item>
     ));
 

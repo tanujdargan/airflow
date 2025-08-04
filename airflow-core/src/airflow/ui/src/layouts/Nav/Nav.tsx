@@ -26,14 +26,9 @@ import {
   useVersionServiceGetVersion,
   useConfigServiceGetConfigs,
 } from "openapi/queries";
-import type {
-  AppBuilderMenuItemResponse,
-  ExternalViewResponse,
-  ConfigResponse,
-} from "openapi/requests/types.gen";
+import type { AppBuilderMenuItemResponse } from "openapi/requests/types.gen";
 import { AirflowPin } from "src/assets/AirflowPin";
 import { DagIcon } from "src/assets/DagIcon";
-import type { NavItemResponse } from "src/utils/types";
 
 import { AdminButton } from "./AdminButton";
 import { BrowseButton } from "./BrowseButton";
@@ -48,19 +43,19 @@ const existingCategories = ["user", "docs", "admin", "browse"];
 
 // Function to categorize navigation items in a single pass
 const categorizeNavItems = (
-  items: Array<NavItemResponse>,
+  items: Array<AppBuilderMenuItemResponse>,
 ): {
-  adminItems: Array<NavItemResponse>;
-  browseItems: Array<NavItemResponse>;
-  docsItems: Array<NavItemResponse>;
-  topNavItems: Array<NavItemResponse>;
-  userItems: Array<NavItemResponse>;
+  adminItems: Array<AppBuilderMenuItemResponse>;
+  browseItems: Array<AppBuilderMenuItemResponse>;
+  docsItems: Array<AppBuilderMenuItemResponse>;
+  topNavItems: Array<AppBuilderMenuItemResponse>;
+  userItems: Array<AppBuilderMenuItemResponse>;
 } => {
-  const adminItems: Array<NavItemResponse> = [];
-  const browseItems: Array<NavItemResponse> = [];
-  const docsItems: Array<NavItemResponse> = [];
-  const topNavItems: Array<NavItemResponse> = [];
-  const userItems: Array<NavItemResponse> = [];
+  const adminItems: Array<AppBuilderMenuItemResponse> = [];
+  const browseItems: Array<AppBuilderMenuItemResponse> = [];
+  const docsItems: Array<AppBuilderMenuItemResponse> = [];
+  const topNavItems: Array<AppBuilderMenuItemResponse> = [];
+  const userItems: Array<AppBuilderMenuItemResponse> = [];
 
   items.forEach((item) => {
     const category = item.category?.toLowerCase();
@@ -97,18 +92,9 @@ export const Nav = () => {
   const { data: config } = useConfigServiceGetConfigs();
   const { t: translate } = useTranslation("common");
 
-  // Get both external views and react apps with nav destination
-  const configWithPlugins = config as
-    | ({ plugins_extra_menu_items?: Array<AppBuilderMenuItemResponse> } & ConfigResponse)
-    | undefined;
-  const navItems: Array<NavItemResponse> =
-    configWithPlugins?.plugins_extra_menu_items?.map(
-      (item: AppBuilderMenuItemResponse) =>
-        ({
-          ...item,
-          destination: "nav" as const,
-        }) satisfies NavItemResponse,
-    ) ?? [];
+  // Get plugin menu items from config instead of plugin service
+  // Type assertion needed until OpenAPI types are regenerated
+  const navItems: Array<AppBuilderMenuItemResponse> = (config as any)?.plugins_extra_menu_items ?? [];
 
   // Categorize all navigation items in a single pass
   const { adminItems, browseItems, docsItems, topNavItems, userItems } = categorizeNavItems(navItems);

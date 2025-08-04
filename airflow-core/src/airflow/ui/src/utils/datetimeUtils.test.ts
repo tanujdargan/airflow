@@ -49,8 +49,8 @@ describe("getDuration", () => {
     expect(getDuration(start, end)).toBe("02:30:00");
   });
 
-  it("handles null or undefined dates", () => {
-    expect(getDuration(undefined, undefined)).toBe("00:00:00");
-    expect(getDuration(undefined, undefined)).toBe("00:00:00");
+  it.each([null, undefined])("handles %s dates", (invalid) => {
+    // cast to any to avoid strict type complaints if getDuration’s signature excludes null
+    expect(getDuration(invalid as any, invalid as any)).toBe("00:00:00");
   });
 });

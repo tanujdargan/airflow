@@ -60,18 +60,14 @@ def _extract_template_fields(class_node: ast.ClassDef) -> list[str]:
                     and target.id == "template_fields"
                     and isinstance(class_item.value, ast.Tuple)
                 ):
-
                     return [elt.value for elt in class_item.value.elts if isinstance(elt, ast.Constant) and isinstance(elt.value, str)]
-
-                    return [str(elt.value) for elt in class_item.value.elts if isinstance(elt, ast.Constant)]
-
         elif isinstance(class_item, ast.AnnAssign):
             if (
                 isinstance(class_item.target, ast.Name)
                 and class_item.target.id == "template_fields"
                 and isinstance(class_item.value, ast.Tuple)
             ):
-    return []
+                return [elt.value for elt in class_item.value.elts if isinstance(elt, ast.Constant) and isinstance(elt.value, str)]
 
 
 def _handle_parent_constructor_kwargs(
