@@ -32,8 +32,10 @@ export const PluginImportErrors = ({ iconOnly = false }: { readonly iconOnly?: b
   const { data: config } = useConfigServiceGetConfigs();
 
   // Get plugin import errors from config instead of plugin service
-  // Type assertion needed until OpenAPI types are regenerated
-  const importErrors = (config as any)?.plugin_import_errors ?? [];
+  interface ConfigWithPluginErrors extends typeof config {
+    plugin_import_errors?: Array<{ source: string; error: string }>;
+  }
+  const importErrors = (config as ConfigWithPluginErrors)?.plugin_import_errors ?? [];
   const importErrorsCount = importErrors.length;
 
   if (importErrorsCount === 0) {
