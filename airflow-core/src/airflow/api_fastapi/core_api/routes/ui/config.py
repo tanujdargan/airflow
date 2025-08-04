@@ -58,56 +58,53 @@ def get_configs(user: GetUserDep) -> ConfigResponse:
     plugins_manager.initialize_flask_plugins()
     plugins_manager.initialize_ui_plugins()
 
-    # Collect plugin menu items from both appbuilder_menu_items (deprecated but kept for backward compatibility)
-    # and external_views with destination "nav" or None
-    plugins_extra_menu_items = []
+from airflow.api_fastapi.core_api.datamodels.plugins import AppBuilderMenuItemResponse
 
-    # Add appbuilder_menu_items for backward compatibility
-    # Once the plugin manager is initialized all its None attributes will be replaced with an empty list
-    if plugins_manager.flask_appbuilder_menu_links:
-        plugins_extra_menu_items.extend(plugins_manager.flask_appbuilder_menu_links)
+def _convert_to_menu_item(item: dict[str, Any], url_prefix: str = "/plugin/") -> AppBuilderMenuItemResponse | None:
+    """Convert various plugin item formats to AppBuilderMenuItemResponse."""
+    href = item.get("href")
+    if not href and item.get("url_route"):
+        href = f"{url_prefix}{item['url_route']}"
+    
+    if not href or not item.get("name"):
+        return None
+    
+    return AppBuilderMenuItemResponse(
+        name=item["name"],
+        href=href,
+        category=item.get("category")
+    )
 
-    # Add external_views that have destination "nav" or None (which defaults to "nav")
-    # external_views is preferred over appbuilder_menu_items
-    if plugins_manager.external_views:
-        for external_view in plugins_manager.external_views:
-            destination = external_view.get("destination")
-            if destination is None or destination == "nav":
-                # Convert external_view to AppBuilderMenuItemResponse format
-                # For external views, we need to construct the href from url_route if href is not present
-                href = external_view.get("href")
-                if not href and external_view.get("url_route"):
-                    href = f"/plugin/{external_view['url_route']}"
-                elif not href:
-                    # Skip if no href and no url_route
-                    continue
+# Collect plugin menu items from both appbuilder_menu_items (deprecated but kept for backward compatibility)
+# and external_views with destination "nav" or None
+plugins_extra_menu_items = []
 
-                menu_item = {
-                    "name": external_view["name"],
-                    "href": href,
-                    "category": external_view.get("category")
-                }
-                plugins_extra_menu_items.append(menu_item)
+# Add appbuilder_menu_items for backward compatibility
+# Once the plugin manager is initialized all its None attributes will be replaced with an empty list
+if plugins_manager.flask_appbuilder_menu_links:
+    for item in plugins_manager.flask_appbuilder_menu_links:
+        menu_item = _convert_to_menu_item(item, url_prefix="")
+        if menu_item:
+            plugins_extra_menu_items.append(menu_item.model_dump())
 
-    # Add react_apps that have destination "nav" or None (which defaults to "nav")
-    if plugins_manager.react_apps:
-        for react_app in plugins_manager.react_apps:
-            destination = react_app.get("destination")
-            if destination is None or destination == "nav":
-                # Convert react_app to AppBuilderMenuItemResponse format
-                # For react apps, we construct the href from url_route
-                url_route = react_app.get("url_route")
-                if not url_route:
-                    # Skip if no url_route
-                    continue
+# Add external_views that have destination "nav" or None (which defaults to "nav")
+# external_views is preferred over appbuilder_menu_items
+if plugins_manager.external_views:
+    for external_view in plugins_manager.external_views:
+        destination = external_view.get("destination")
+        if destination is None or destination == "nav":
+            menu_item = _convert_to_menu_item(external_view)
+            if menu_item:
+                plugins_extra_menu_items.append(menu_item.model_dump())
 
-                href = f"/plugin/{url_route}"
-                menu_item = {
-                    "name": react_app["name"],
-                    "href": href,
-                    "category": react_app.get("category")
-                }
-                plugins_extra_menu_items.append(menu_item)
+# Add react_apps that have destination "nav" or None (which defaults to "nav")
+if plugins_manager.react_apps:
+    for react_app in plugins_manager.react_apps:
+        destination = react_app.get("destination")
+        if destination is None or destination == "nav":
+            menu_item = _convert_to_menu_item(react_app)
+            if menu_item:
+                plugins_extra_menu_items.append(menu_item.model_dump())
 
     # Collect plugin import errors to avoid 403 errors for users without plugin permissions
     plugin_import_errors = []
